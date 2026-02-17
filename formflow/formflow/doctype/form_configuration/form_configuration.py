@@ -1,9 +1,13 @@
-# Copyright (c) 2026, Ameen and contributors
-# For license information, please see license.txt
-
-# import frappe
+import frappe
 from frappe.model.document import Document
 
-
 class FormConfiguration(Document):
-	pass
+
+    def validate(self):
+        self.form_name = frappe.scrub(self.form_name)
+
+        if frappe.db.exists(
+            "Form Configuration",
+            {"form_name": self.form_name, "name": ["!=", self.name]}
+        ):
+            frappe.throw("Form Name must be unique")
