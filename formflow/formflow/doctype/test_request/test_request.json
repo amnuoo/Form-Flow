@@ -1,54 +1,38 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "autoincrement",
- "creation": "2026-02-17 15:24:47.596818",
+ "creation": "2026-02-18 18:43:16.422692",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "form",
-  "unique_id",
-  "ip_address",
-  "action",
-  "timestamp"
+  "full_name",
+  "email",
+  "reference_id"
  ],
  "fields": [
   {
-   "fieldname": "form",
-   "fieldtype": "Link",
-   "label": "Form",
-   "options": "Form Configuration"
-  },
-  {
-   "fieldname": "unique_id",
+   "fieldname": "full_name",
    "fieldtype": "Data",
-   "label": "Unique ID"
+   "label": "Full Name"
   },
   {
-   "fieldname": "ip_address",
+   "fieldname": "email",
    "fieldtype": "Data",
-   "label": "IP Address"
+   "label": "Email"
   },
   {
-   "fieldname": "action",
-   "fieldtype": "Select",
-   "label": "Action",
-   "options": "Create\nUpdate"
-  },
-  {
-   "fieldname": "timestamp",
-   "fieldtype": "Datetime",
-   "label": "Timestamp"
+   "fieldname": "reference_id",
+   "fieldtype": "Data",
+   "label": "Reference ID"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-18 17:59:10.204621",
+ "modified": "2026-02-18 18:44:18.851545",
  "modified_by": "Administrator",
  "module": "Formflow",
- "name": "Form Submission Log",
- "naming_rule": "Autoincrement",
+ "name": "Test Request",
  "owner": "Administrator",
  "permissions": [
   {
