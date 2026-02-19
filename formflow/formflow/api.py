@@ -87,3 +87,12 @@ def submit_form(form_name, data, unique_id=None):
 
         new_id = unique_id
         action = "Update"
+    
+    log_submission(form.name, new_id, action)
+
+    return {
+        "message": "Success",
+        "unique_id": new_id
+    }
+
+
