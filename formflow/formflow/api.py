@@ -18,6 +18,7 @@ def get_form_config(form_name):
 
     return form
 
+
 @frappe.whitelist(allow_guest=True)
 def submit_form(form_name, data, unique_id=None):
 
@@ -37,7 +38,6 @@ def submit_form(form_name, data, unique_id=None):
     if not frappe.db.exists("DocType", form.target_doctype):
         frappe.throw("Target DocType does not exist")
 
-    
     allowed_fields = [
         f.fieldname for f in form.form_fields if not f.hidden
     ]
@@ -68,6 +68,7 @@ def submit_form(form_name, data, unique_id=None):
         doc.insert(ignore_permissions=True)
 
         action = "Create"
+
     else:
 
         if not form.allow_update:
@@ -87,13 +88,14 @@ def submit_form(form_name, data, unique_id=None):
 
         new_id = unique_id
         action = "Update"
-    
+
     log_submission(form.name, new_id, action)
 
     return {
         "message": "Success",
         "unique_id": new_id
     }
+
 
 @frappe.whitelist(allow_guest=True)
 def get_doc_by_unique_id(form_name, unique_id):
@@ -118,6 +120,7 @@ def get_doc_by_unique_id(form_name, unique_id):
 
     return doc
 
+
 def log_submission(form_name, unique_id, action):
 
     frappe.get_doc({
@@ -128,5 +131,3 @@ def log_submission(form_name, unique_id, action):
         "action": action,
         "timestamp": frappe.utils.now()
     }).insert(ignore_permissions=True)
-
-
