@@ -18,3 +18,21 @@ def get_form_config(form_name):
 
     return form
 
+@frappe.whitelist(allow_guest=True)
+def submit_form(form_name, data, unique_id=None):
+
+    data = frappe.parse_json(data)
+
+    form = frappe.get_doc(
+        "Form Configuration",
+        {"form_name": form_name}
+    )
+
+    if not form.is_active:
+        frappe.throw("Form inactive")
+
+    if form.require_login and frappe.session.user == "Guest":
+        frappe.throw("Login required")
+
+    if not frappe.db.exists("DocType", form.target_doctype):
+        frappe.throw("Target DocType does not exist")
