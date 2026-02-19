@@ -118,4 +118,15 @@ def get_doc_by_unique_id(form_name, unique_id):
 
     return doc
 
+def log_submission(form_name, unique_id, action):
+
+    frappe.get_doc({
+        "doctype": "Form Submission Log",
+        "form": form_name,
+        "unique_id": unique_id,
+        "ip_address": frappe.local.request_ip,
+        "action": action,
+        "timestamp": frappe.utils.now()
+    }).insert(ignore_permissions=True)
+
 
