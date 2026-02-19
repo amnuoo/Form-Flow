@@ -58,4 +58,31 @@
         titleEl.innerText = r.message.form_name;
 
         const fields = r.message.form_fields || [];
-        
+        fields.forEach(field => {
+
+if (field.hidden) return;
+
+const div = document.createElement("div");
+div.className = "mb-3";
+
+const label = document.createElement("label");
+label.className = "form-label";
+label.innerText = (field.label_override || field.fieldname.replace(/_/g, " ").toUpperCase());
+
+if (field.required) {
+    label.innerHTML += " <span style='color:red'>*</span>";
+}
+
+const input = document.createElement("input");
+input.type = "text";
+input.className = "form-control";
+input.name = field.fieldname;
+
+if (field.read_only) {
+    input.readOnly = true;
+}
+
+div.appendChild(label);
+div.appendChild(input);
+fieldsContainer.appendChild(div);
+});
