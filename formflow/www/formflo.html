@@ -44,4 +44,18 @@
             errorEl.style.display = "block";
             return;
         }
-    });
+        frappe.call({
+    method: "formflow.formflow.api.get_form_config",
+    args: { form_name: formName },
+    callback: function (r) {
+
+        if (!r.message) {
+            errorEl.innerText = "Form not found.";
+            errorEl.style.display = "block";
+            return;
+        }
+
+        titleEl.innerText = r.message.form_name;
+
+        const fields = r.message.form_fields || [];
+        
