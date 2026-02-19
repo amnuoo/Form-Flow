@@ -95,4 +95,27 @@ def submit_form(form_name, data, unique_id=None):
         "unique_id": new_id
     }
 
+@frappe.whitelist(allow_guest=True)
+def get_doc_by_unique_id(form_name, unique_id):
+
+    form = frappe.get_doc(
+        "Form Configuration",
+        {"form_name": form_name}
+    )
+
+    if not form.allow_update:
+        frappe.throw("Update not allowed")
+
+    doc_name = frappe.db.get_value(
+        form.target_doctype,
+        {form.unique_id_field: unique_id}
+    )
+
+    if not doc_name:
+        frappe.throw("Invalid Reference ID")
+
+    doc = frappe.get_doc(form.target_doctype, doc_name)
+
+    return doc
+
 
