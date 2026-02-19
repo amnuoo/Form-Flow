@@ -51,3 +51,21 @@ def submit_form(form_name, data, unique_id=None):
         if field.required and not cleaned_data.get(field.fieldname):
             frappe.throw(f"{field.fieldname} is mandatory")
 
+    if not unique_id:
+
+        if not form.allow_create:
+            frappe.throw("Create not allowed")
+
+        doc = frappe.new_doc(form.target_doctype)
+        doc.update(cleaned_data)
+
+        new_id = generate_unique_id(
+            form.target_doctype,
+            form.unique_id_field
+        )
+
+        doc.set(form.unique_id_field, new_id)
+        doc.insert(ignore_permissions=True)
+
+        action = "Create"
+
