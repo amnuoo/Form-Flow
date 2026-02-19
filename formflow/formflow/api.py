@@ -68,4 +68,22 @@ def submit_form(form_name, data, unique_id=None):
         doc.insert(ignore_permissions=True)
 
         action = "Create"
+    else:
 
+        if not form.allow_update:
+            frappe.throw("Update not allowed")
+
+        doc_name = frappe.db.get_value(
+            form.target_doctype,
+            {form.unique_id_field: unique_id}
+        )
+
+        if not doc_name:
+            frappe.throw("Invalid Reference ID")
+
+        doc = frappe.get_doc(form.target_doctype, doc_name)
+        doc.update(cleaned_data)
+        doc.save(ignore_permissions=True)
+
+        new_id = unique_id
+        action = "Update"
