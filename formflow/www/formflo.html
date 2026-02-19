@@ -25,3 +25,23 @@
         Submit Form
     </button>
 </form>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+    
+        const params = new URLSearchParams(window.location.search);
+        const formName = params.get("form_name");
+        const uniqueId = params.get("id");
+    
+        const titleEl = document.getElementById("form-title");
+        const errorEl = document.getElementById("error");
+        const successEl = document.getElementById("success");
+        const fieldsContainer = document.getElementById("fields-container");
+        const formEl = document.getElementById("dynamic-form");
+    
+        if (!formName) {
+            errorEl.innerText = "Form name missing.";
+            errorEl.style.display = "block";
+            return;
+        }
+    });
