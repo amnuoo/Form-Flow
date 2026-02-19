@@ -85,4 +85,37 @@ if (field.read_only) {
 div.appendChild(label);
 div.appendChild(input);
 fieldsContainer.appendChild(div);
+}); 
+formEl.addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    errorEl.style.display = "none";
+    successEl.style.display = "none";
+
+    const formData = {};
+    const inputs = formEl.querySelectorAll("input");
+
+    inputs.forEach(input => {
+        formData[input.name] = input.value;
+    });
+
+    frappe.call({
+        method: "formflow.formflow.api.submit_form",
+        args: {
+            form_name: formName,
+            data: formData,
+            unique_id: uniqueId
+        },
+        callback: function (r) {
+            successEl.innerText =
+                "Submission successful! Reference ID: " +
+                r.message.unique_id;
+            successEl.style.display = "block";
+        },
+        error: function (r) {
+            errorEl.innerText = "Submission failed.";
+            errorEl.style.display = "block";
+        }
+    });
+
 });
