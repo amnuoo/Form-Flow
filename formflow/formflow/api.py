@@ -33,25 +33,21 @@ def submit_form(form_name, data, unique_id=None):
         {"form_name": form_name}
     )
 
-    # Check active
     if not form.is_active:
         frappe.local.response.http_status_code = 403
         frappe.response["message"] = "Form is inactive"
         return
 
-    # Check login
     if form.require_login and frappe.session.user == "Guest":
         frappe.local.response.http_status_code = 401
         frappe.response["message"] = "Login required"
         return
 
-    # Check target doctype exists
     if not frappe.db.exists("DocType", form.target_doctype):
         frappe.local.response.http_status_code = 404
         frappe.response["message"] = "Target DocType does not exist"
         return
 
-    # Allowed fields only
     allowed_fields = [
         f.fieldname for f in form.form_fields if not f.hidden
     ]
@@ -61,12 +57,12 @@ def submit_form(form_name, data, unique_id=None):
         if key in allowed_fields:
             cleaned_data[key] = data[key]
 
-    # Required field validation
     for field in form.form_fields:
         if field.required and not cleaned_data.get(field.fieldname):
             frappe.local.response.http_status_code = 400
             frappe.response["message"] = f"{field.fieldname} is mandatory"
             return
+
 
     if not unique_id:
 
@@ -87,6 +83,7 @@ def submit_form(form_name, data, unique_id=None):
         doc.insert(ignore_permissions=True)
 
         action = "Create"
+
 
     else:
 
@@ -112,14 +109,11 @@ def submit_form(form_name, data, unique_id=None):
         new_id = unique_id
         action = "Update"
 
-    # Log submission
     log_submission(form.name, new_id, action)
 
+
     return {
-        "message": {
-            "status": "Success",
-            "unique_id": new_id
-        }
+        "unique_id": new_id
     }
 
 
@@ -160,4 +154,4 @@ def log_submission(form_name, unique_id, action):
         "ip_address": frappe.local.request_ip,
         "action": action,
         "timestamp": frappe.utils.now()
-    }).insert(ignore_permissions=True)  
+    }).insert(ignore_permissions=True)
