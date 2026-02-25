@@ -13,21 +13,32 @@
         [[ success ]]
     </div>
 
-    <div v-for="field in visibleFields"
-         :key="field.fieldname"
-         class="mb-3">
+    <div>
 
-        <label class="form-label">
-            [[ field.label_override || formatLabel(field.fieldname) ]]
-            <span v-if="field.required" style="color:red">*</span>
-        </label>
+        <div v-for="field in visibleFields"
+             :key="field.fieldname"
+             class="mb-3">
 
-        <input
-            type="text"
-            class="form-control"
-            v-model="formData[field.fieldname]"
-            :readonly="field.read_only"
-        >
+            <label class="form-label">
+                [[ field.label_override || formatLabel(field.fieldname) ]]
+                <span v-if="field.required" style="color:red">*</span>
+            </label>
+
+            <input
+                type="text"
+                class="form-control"
+                v-model="formData[field.fieldname]"
+                :readonly="field.read_only"
+            >
+        </div>
+
+        <button
+            type="button"
+            class="btn btn-primary w-100 mt-3"
+            @click="submitForm">
+            Submit Form
+        </button>
+
     </div>
 
 </div>
@@ -81,6 +92,7 @@ document.addEventListener("DOMContentLoaded", function () {
             this.loadForm();
         },
         methods: {
+
             async loadForm() {
                 const response = await fetch(
                     `/api/method/formflow.formflow.api.get_form_config?form_name=${this.formName}`
@@ -99,10 +111,43 @@ document.addEventListener("DOMContentLoaded", function () {
                     this.formData[field.fieldname] = "";
                 });
             },
+
+            async submitForm() {
+                this.error = "";
+                this.success = "";
+
+                const response = await fetch(
+                    `/api/method/formflow.formflow.api.submit_form`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            form_name: this.formName,
+                            data: this.formData,
+                            unique_id: this.uniqueId
+                        })
+                    }
+                );
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    this.error = result.message || "Operation not allowed.";
+                    return;
+                }
+
+                this.success =
+                    "Submission successful! Reference ID: " +
+                    result.message.unique_id;
+            },
+
             formatLabel(name) {
                 return name.replace(/_/g, " ").toUpperCase();
             }
         }
+
     }).mount("#app");
 
 });
