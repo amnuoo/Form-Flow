@@ -13,6 +13,23 @@
         [[ success ]]
     </div>
 
+    <div v-for="field in visibleFields"
+         :key="field.fieldname"
+         class="mb-3">
+
+        <label class="form-label">
+            [[ field.label_override || formatLabel(field.fieldname) ]]
+            <span v-if="field.required" style="color:red">*</span>
+        </label>
+
+        <input
+            type="text"
+            class="form-control"
+            v-model="formData[field.fieldname]"
+            :readonly="field.read_only"
+        >
+    </div>
+
 </div>
 
 <style>
@@ -39,7 +56,19 @@ document.addEventListener("DOMContentLoaded", function () {
             return {
                 formTitle: "Loading Form...",
                 error: "",
-                success: ""
+                success: "",
+                fields: [],
+                formData: {}
+            }
+        },
+        computed: {
+            visibleFields() {
+                return this.fields.filter(f => !f.hidden);
+            }
+        },
+        methods: {
+            formatLabel(name) {
+                return name.replace(/_/g, " ").toUpperCase();
             }
         }
     }).mount("#app");
