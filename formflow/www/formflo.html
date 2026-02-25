@@ -58,7 +58,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 error: "",
                 success: "",
                 fields: [],
-                formData: {}
+                formData: {},
+                formName: "",
+                uniqueId: ""
             }
         },
         computed: {
@@ -66,7 +68,37 @@ document.addEventListener("DOMContentLoaded", function () {
                 return this.fields.filter(f => !f.hidden);
             }
         },
+        mounted() {
+            const params = new URLSearchParams(window.location.search);
+            this.formName = params.get("form_name");
+            this.uniqueId = params.get("id");
+
+            if (!this.formName) {
+                this.error = "Form name missing.";
+                return;
+            }
+
+            this.loadForm();
+        },
         methods: {
+            async loadForm() {
+                const response = await fetch(
+                    `/api/method/formflow.formflow.api.get_form_config?form_name=${this.formName}`
+                );
+                const result = await response.json();
+
+                if (!response.ok) {
+                    this.error = result.message || "Failed to load form.";
+                    return;
+                }
+
+                this.formTitle = result.message.form_name;
+                this.fields = result.message.form_fields || [];
+
+                this.fields.forEach(field => {
+                    this.formData[field.fieldname] = "";
+                });
+            },
             formatLabel(name) {
                 return name.replace(/_/g, " ").toUpperCase();
             }
