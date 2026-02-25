@@ -68,9 +68,6 @@ def submit_form(form_name, data, unique_id=None):
             frappe.response["message"] = f"{field.fieldname} is mandatory"
             return
 
-    # =========================
-    # CREATE MODE
-    # =========================
     if not unique_id:
 
         if not form.allow_create:
@@ -91,9 +88,6 @@ def submit_form(form_name, data, unique_id=None):
 
         action = "Create"
 
-    # =========================
-    # UPDATE MODE
-    # =========================
     else:
 
         if not form.allow_update:
@@ -166,4 +160,4 @@ def log_submission(form_name, unique_id, action):
         "ip_address": frappe.local.request_ip,
         "action": action,
         "timestamp": frappe.utils.now()
-    }).insert(ignore_permissions=True)
+    }).insert(ignore_permissions=True)  
