@@ -3,54 +3,110 @@
 
 <div id="app" class="form-wrapper">
 
-    <h2 class="text-center">[[ formTitle ]]</h2>
+    <h2 class="text-center mb-4">[[ formTitle ]]</h2>
 
-    <div v-if="error" class="alert alert-danger">
-        [[ error ]]
-    </div>
+    <div v-if="error" class="alert alert-danger">[[ error ]]</div>
+    <div v-if="success" class="alert alert-success">[[ success ]]</div>
 
-    <div v-if="success" class="alert alert-success">
-        [[ success ]]
-    </div>
+    <div v-for="field in visibleFields" :key="field.fieldname" class="mb-3">
 
-    <div>
+        <label class="form-label fw-semibold">
+            [[ field.label ]]
+            <span v-if="field.required" class="text-danger">*</span>
+        </label>
 
-        <div v-for="field in visibleFields"
-             :key="field.fieldname"
-             class="mb-3">
+        <!-- TEXT / NUMERIC -->
+        <input v-if="inputTypes.includes(field.fieldtype)"
+               type="text"
+               class="form-control"
+               v-model="formData[field.fieldname]">
 
-            <label class="form-label">
-                [[ field.label_override || formatLabel(field.fieldname) ]]
-                <span v-if="field.required" style="color:red">*</span>
-            </label>
+        <!-- DATE -->
+        <input v-else-if="field.fieldtype === 'Date'"
+               type="date"
+               class="form-control"
+               v-model="formData[field.fieldname]">
 
-            <input
-                type="text"
-                class="form-control"
-                v-model="formData[field.fieldname]"
-                :readonly="field.read_only"
-            >
+        <!-- CHECKBOX -->
+        <div v-else-if="field.fieldtype === 'Check'" class="form-check">
+            <input type="checkbox"
+                   class="form-check-input"
+                   v-model="formData[field.fieldname]"
+                   true-value="1"
+                   false-value="0">
         </div>
 
-        <button
-            type="button"
-            class="btn btn-primary w-100 mt-3"
-            @click="submitForm">
-            Submit Form
-        </button>
+        <!-- ✅ ATTACH (RESUME SUPPORT ADDED BACK) -->
+        <div v-else-if="field.fieldtype === 'Attach'">
+
+            <input type="file"
+                   class="d-none"
+                   :id="field.fieldname"
+                   @change="handleFileUpload($event, field.fieldname)">
+
+            <label :for="field.fieldname"
+                   class="btn btn-outline-primary w-100">
+                Choose File
+            </label>
+
+            <div v-if="formData[field.fieldname]"
+                 class="small text-success mt-2">
+                File uploaded successfully
+            </div>
+
+        </div>
+
+        <!-- CHILD TABLE -->
+        <div v-else-if="field.fieldtype === 'Table'" class="border p-3 rounded">
+
+            <div v-for="(row, index) in formData[field.fieldname]"
+                 :key="index"
+                 class="mb-3 border-bottom pb-3">
+
+                <div v-for="child in field.child_fields"
+                     :key="child.fieldname"
+                     class="mb-2">
+
+                    <label class="small">[[ child.label ]]</label>
+
+                    <input type="text"
+                           class="form-control form-control-sm"
+                           v-model="row[child.fieldname]">
+                </div>
+
+                <button type="button"
+                        class="btn btn-sm btn-danger"
+                        @click="removeChildRow(field.fieldname, index)">
+                    Remove
+                </button>
+            </div>
+
+            <button type="button"
+                    class="btn btn-sm btn-secondary"
+                    @click="addChildRow(field)">
+                Add Row
+            </button>
+
+        </div>
 
     </div>
+
+    <button type="button"
+            class="btn btn-dark w-100 mt-4"
+            @click="submitForm">
+        Submit Form
+    </button>
 
 </div>
 
 <style>
 .form-wrapper {
-    max-width: 500px;
-    margin: 70px auto;
-    padding: 30px;
+    max-width: 650px;
+    margin: 60px auto;
+    padding: 35px;
     background: white;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    border-radius: 14px;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.08);
 }
 </style>
 
@@ -59,70 +115,78 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
 
-    const { createApp } = Vue;
+const { createApp } = Vue;
 
-    createApp({
-        delimiters: ['[[', ']]'],
-        data() {
-            return {
-                formTitle: "Loading Form...",
-                error: "",
-                success: "",
-                fields: [],
-                formData: {},
-                formName: "",
-                uniqueId: ""
-            }
-        },
-        computed: {
-            visibleFields() {
-                return this.fields.filter(f => !f.hidden);
-            }
-        },
-        mounted() {
-            const params = new URLSearchParams(window.location.search);
-            this.formName = params.get("form_name");
-            this.uniqueId = params.get("id");
+createApp({
+    delimiters: ['[[', ']]'],
 
-            if (!this.formName) {
-                this.error = "Form name missing.";
-                return;
-            }
+    data() {
+        return {
+            formTitle: "Loading Form...",
+            fields: [],
+            formData: {},
+            error: "",
+            success: "",
+            formName: "",
+            uniqueId: "",
+            inputTypes: [
+                "Data","Small Text","Phone","Link","Email",
+                "Int","Float","Currency","Percent"
+            ]
+        }
+    },
 
-            this.loadForm();
-        },
-        methods: {
+    computed: {
+        visibleFields() {
+            return this.fields.filter(f => !f.hidden);
+        }
+    },
 
-            async loadForm() {
-                const response = await fetch(
-                    `/api/method/formflow.formflow.api.get_form_config?form_name=${this.formName}`
-                );
-                const result = await response.json();
+    mounted() {
+        const params = new URLSearchParams(window.location.search);
+        this.formName = params.get("form_name");
+        this.uniqueId = params.get("id");
+        this.loadForm();
+    },
 
-                if (!response.ok) {
-                    this.error = result.message || "Failed to load form.";
-                    return;
+    methods: {
+
+        async loadForm() {
+
+            const response = await fetch(
+                `/api/method/formflow.formflow.api.get_form_config?form_name=${this.formName}`
+            );
+
+            const result = await response.json();
+
+            this.formTitle = result.message.form_name;
+            this.fields = result.message.form_fields;
+
+            this.fields.forEach(field => {
+
+                if (field.fieldtype === "Table") {
+                    this.formData[field.fieldname] = [];
+                } else if (field.fieldtype === "Check") {
+                    this.formData[field.fieldname] = 0;
+                } else {
+                    this.formData[field.fieldname] = "";
                 }
 
-                this.formTitle = result.message.form_name;
-                this.fields = result.message.form_fields || [];
+            });
+        },
 
-                this.fields.forEach(field => {
-                    this.formData[field.fieldname] = "";
-                });
-            },
+        async submitForm() {
 
-            async submitForm() {
-                this.error = "";
-                this.success = "";
+            this.error = "";
+            this.success = "";
+
+            try {
 
                 const response = await fetch(
                     `/api/method/formflow.formflow.api.submit_form`,
                     {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
+                        headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             form_name: this.formName,
                             data: this.formData,
@@ -134,21 +198,63 @@ document.addEventListener("DOMContentLoaded", function () {
                 const result = await response.json();
 
                 if (!response.ok) {
-                    this.error = result.message || "Operation not allowed.";
+
+                    if (result._server_messages) {
+                        const serverMessages = JSON.parse(result._server_messages);
+                        const messageObj = JSON.parse(serverMessages[0]);
+                        this.error = messageObj.message;
+                    } else {
+                        this.error = "creation not allowed";
+                    }
+
                     return;
                 }
 
                 this.success =
                     "Submission successful! Reference ID: " +
                     result.message.unique_id;
-            },
 
-            formatLabel(name) {
-                return name.replace(/_/g, " ").toUpperCase();
+            } catch (err) {
+                this.error = "creation not allowed";
             }
+        },
+
+        async handleFileUpload(event, fieldname) {
+
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const fd = new FormData();
+            fd.append("file", file);
+            fd.append("is_private", 0);
+
+            const response = await fetch("/api/method/upload_file", {
+                method: "POST",
+                body: fd
+            });
+
+            const result = await response.json();
+
+            if (result.message && result.message.file_url) {
+                this.formData[fieldname] = result.message.file_url;
+            }
+        },
+
+        addChildRow(field) {
+            const row = {};
+            field.child_fields.forEach(child => {
+                row[child.fieldname] = "";
+            });
+            this.formData[field.fieldname].push(row);
+        },
+
+        removeChildRow(fieldname, index) {
+            this.formData[fieldname].splice(index, 1);
         }
 
-    }).mount("#app");
+    }
+
+}).mount("#app");
 
 });
 </script>

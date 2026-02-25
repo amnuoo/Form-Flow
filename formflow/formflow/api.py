@@ -2,74 +2,82 @@ import frappe
 from .utils import generate_unique_id
 
 
+
 @frappe.whitelist(allow_guest=True)
 def get_form_config(form_name):
 
-    form = frappe.get_doc(
-        "Form Configuration",
-        {"form_name": form_name}
-    )
+    form = frappe.get_doc("Form Configuration", {"form_name": form_name})
 
     if not form.is_active:
-        frappe.local.response.http_status_code = 403
-        frappe.response["message"] = "Form is inactive"
-        return
+        frappe.throw("Form is inactive")
 
     if form.require_login and frappe.session.user == "Guest":
-        frappe.local.response.http_status_code = 401
-        frappe.response["message"] = "Login required to access this form"
-        return
+        frappe.throw("Login required to access this form")
 
-    return form
+    meta = frappe.get_meta(form.target_doctype)
+
+    fields = []
+
+    for f in form.form_fields:
+        df = meta.get_field(f.fieldname)
+        if not df:
+            continue
+
+        field_data = {
+            "fieldname": f.fieldname,
+            "label": f.label_override or df.label,
+            "required": f.required,
+            "hidden": f.hidden,
+            "read_only": f.read_only,
+            "fieldtype": df.fieldtype
+        }
+
+        # Child table support
+        if df.fieldtype == "Table":
+            child_meta = frappe.get_meta(df.options)
+            field_data["child_fields"] = [
+                {
+                    "fieldname": c.fieldname,
+                    "label": c.label,
+                    "fieldtype": c.fieldtype
+                }
+                for c in child_meta.fields
+                if c.fieldtype not in ["Section Break", "Column Break"]
+            ]
+
+        fields.append(field_data)
+
+    return {
+        "form_name": form.form_name,
+        "form_fields": fields
+    }
+
 
 
 @frappe.whitelist(allow_guest=True)
 def submit_form(form_name, data, unique_id=None):
 
     data = frappe.parse_json(data)
-
-    form = frappe.get_doc(
-        "Form Configuration",
-        {"form_name": form_name}
-    )
+    form = frappe.get_doc("Form Configuration", {"form_name": form_name})
 
     if not form.is_active:
-        frappe.local.response.http_status_code = 403
-        frappe.response["message"] = "Form is inactive"
-        return
+        frappe.throw("Form is inactive")
 
     if form.require_login and frappe.session.user == "Guest":
-        frappe.local.response.http_status_code = 401
-        frappe.response["message"] = "Login required"
-        return
+        frappe.throw("Login required")
 
-    if not frappe.db.exists("DocType", form.target_doctype):
-        frappe.local.response.http_status_code = 404
-        frappe.response["message"] = "Target DocType does not exist"
-        return
-
-    allowed_fields = [
-        f.fieldname for f in form.form_fields if not f.hidden
-    ]
-
-    cleaned_data = {}
-    for key in data:
-        if key in allowed_fields:
-            cleaned_data[key] = data[key]
+    allowed_fields = [f.fieldname for f in form.form_fields if not f.hidden]
+    cleaned_data = {k: v for k, v in data.items() if k in allowed_fields}
 
     for field in form.form_fields:
         if field.required and not cleaned_data.get(field.fieldname):
-            frappe.local.response.http_status_code = 400
-            frappe.response["message"] = f"{field.fieldname} is mandatory"
-            return
+            frappe.throw(f"{field.fieldname} is mandatory")
 
-
+  
     if not unique_id:
 
         if not form.allow_create:
-            frappe.local.response.http_status_code = 403
-            frappe.response["message"] = "Creation not allowed"
-            return
+            frappe.throw("creation not allowed")
 
         doc = frappe.new_doc(form.target_doctype)
         doc.update(cleaned_data)
@@ -82,15 +90,11 @@ def submit_form(form_name, data, unique_id=None):
         doc.set(form.unique_id_field, new_id)
         doc.insert(ignore_permissions=True)
 
-        action = "Create"
-
 
     else:
 
         if not form.allow_update:
-            frappe.local.response.http_status_code = 403
-            frappe.response["message"] = "Updation not allowed"
-            return
+            frappe.throw("Form update is not allowed")
 
         doc_name = frappe.db.get_value(
             form.target_doctype,
@@ -98,60 +102,12 @@ def submit_form(form_name, data, unique_id=None):
         )
 
         if not doc_name:
-            frappe.local.response.http_status_code = 404
-            frappe.response["message"] = "Invalid Reference ID"
-            return
+            frappe.throw("Invalid Reference ID")
 
         doc = frappe.get_doc(form.target_doctype, doc_name)
         doc.update(cleaned_data)
         doc.save(ignore_permissions=True)
 
         new_id = unique_id
-        action = "Update"
 
-    log_submission(form.name, new_id, action)
-
-
-    return {
-        "unique_id": new_id
-    }
-
-
-@frappe.whitelist(allow_guest=True)
-def get_doc_by_unique_id(form_name, unique_id):
-
-    form = frappe.get_doc(
-        "Form Configuration",
-        {"form_name": form_name}
-    )
-
-    if not form.allow_update:
-        frappe.local.response.http_status_code = 403
-        frappe.response["message"] = "Updation not allowed"
-        return
-
-    doc_name = frappe.db.get_value(
-        form.target_doctype,
-        {form.unique_id_field: unique_id}
-    )
-
-    if not doc_name:
-        frappe.local.response.http_status_code = 404
-        frappe.response["message"] = "Invalid Reference ID"
-        return
-
-    doc = frappe.get_doc(form.target_doctype, doc_name)
-
-    return doc
-
-
-def log_submission(form_name, unique_id, action):
-
-    frappe.get_doc({
-        "doctype": "Form Submission Log",
-        "form": form_name,
-        "unique_id": unique_id,
-        "ip_address": frappe.local.request_ip,
-        "action": action,
-        "timestamp": frappe.utils.now()
-    }).insert(ignore_permissions=True)
+    return {"unique_id": new_id}
