@@ -11,10 +11,14 @@ def get_form_config(form_name):
     )
 
     if not form.is_active:
-        frappe.throw("Form is inactive")
+        frappe.local.response.http_status_code = 403
+        frappe.response["message"] = "Form is inactive"
+        return
 
     if form.require_login and frappe.session.user == "Guest":
-        frappe.throw("Login required to access this form")
+        frappe.local.response.http_status_code = 401
+        frappe.response["message"] = "Login required to access this form"
+        return
 
     return form
 
@@ -29,15 +33,25 @@ def submit_form(form_name, data, unique_id=None):
         {"form_name": form_name}
     )
 
+    # Check active
     if not form.is_active:
-        frappe.throw("Form inactive")
+        frappe.local.response.http_status_code = 403
+        frappe.response["message"] = "Form is inactive"
+        return
 
+    # Check login
     if form.require_login and frappe.session.user == "Guest":
-        frappe.throw("Login required")
+        frappe.local.response.http_status_code = 401
+        frappe.response["message"] = "Login required"
+        return
 
+    # Check target doctype exists
     if not frappe.db.exists("DocType", form.target_doctype):
-        frappe.throw("Target DocType does not exist")
+        frappe.local.response.http_status_code = 404
+        frappe.response["message"] = "Target DocType does not exist"
+        return
 
+    # Allowed fields only
     allowed_fields = [
         f.fieldname for f in form.form_fields if not f.hidden
     ]
@@ -47,14 +61,22 @@ def submit_form(form_name, data, unique_id=None):
         if key in allowed_fields:
             cleaned_data[key] = data[key]
 
+    # Required field validation
     for field in form.form_fields:
         if field.required and not cleaned_data.get(field.fieldname):
-            frappe.throw(f"{field.fieldname} is mandatory")
+            frappe.local.response.http_status_code = 400
+            frappe.response["message"] = f"{field.fieldname} is mandatory"
+            return
 
+    # =========================
+    # CREATE MODE
+    # =========================
     if not unique_id:
 
         if not form.allow_create:
-            frappe.throw("Create not allowed")
+            frappe.local.response.http_status_code = 403
+            frappe.response["message"] = "Creation not allowed"
+            return
 
         doc = frappe.new_doc(form.target_doctype)
         doc.update(cleaned_data)
@@ -69,10 +91,15 @@ def submit_form(form_name, data, unique_id=None):
 
         action = "Create"
 
+    # =========================
+    # UPDATE MODE
+    # =========================
     else:
 
         if not form.allow_update:
-            frappe.throw("Update not allowed")
+            frappe.local.response.http_status_code = 403
+            frappe.response["message"] = "Updation not allowed"
+            return
 
         doc_name = frappe.db.get_value(
             form.target_doctype,
@@ -80,7 +107,9 @@ def submit_form(form_name, data, unique_id=None):
         )
 
         if not doc_name:
-            frappe.throw("Invalid Reference ID")
+            frappe.local.response.http_status_code = 404
+            frappe.response["message"] = "Invalid Reference ID"
+            return
 
         doc = frappe.get_doc(form.target_doctype, doc_name)
         doc.update(cleaned_data)
@@ -89,11 +118,14 @@ def submit_form(form_name, data, unique_id=None):
         new_id = unique_id
         action = "Update"
 
+    # Log submission
     log_submission(form.name, new_id, action)
 
     return {
-        "message": "Success",
-        "unique_id": new_id
+        "message": {
+            "status": "Success",
+            "unique_id": new_id
+        }
     }
 
 
@@ -106,7 +138,9 @@ def get_doc_by_unique_id(form_name, unique_id):
     )
 
     if not form.allow_update:
-        frappe.throw("Update not allowed")
+        frappe.local.response.http_status_code = 403
+        frappe.response["message"] = "Updation not allowed"
+        return
 
     doc_name = frappe.db.get_value(
         form.target_doctype,
@@ -114,7 +148,9 @@ def get_doc_by_unique_id(form_name, unique_id):
     )
 
     if not doc_name:
-        frappe.throw("Invalid Reference ID")
+        frappe.local.response.http_status_code = 404
+        frappe.response["message"] = "Invalid Reference ID"
+        return
 
     doc = frappe.get_doc(form.target_doctype, doc_name)
 

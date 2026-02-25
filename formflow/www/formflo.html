@@ -1,134 +1,29 @@
 {% extends "templates/web.html" %}
 {% block page_content %}
 
+<div id="app" class="form-wrapper">
+    <h2 class="text-center">Form</h2>
+</div>
+
 <style>
-    .form-wrapper {
-        max-width: 500px;
-        margin: 70px auto;
-        padding: 30px;
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-    }
+.form-wrapper {
+    max-width: 500px;
+    margin: 70px auto;
+    padding: 30px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
 </style>
 
-<div class="form-wrapper">
-
-    <h2 id="form-title" class="text-center">Loading Form...</h2>
-
-    <div id="error" class="alert alert-danger" style="display:none;"></div>
-    <div id="success" class="alert alert-success" style="display:none;"></div>
-
-    <form id="dynamic-form">
-        <div id="fields-container"></div>
-
-        <button type="submit"
-                class="btn btn-primary w-100 mt-3">
-            Submit Form
-        </button>
-    </form>
-
-</div>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
 
-    const params = new URLSearchParams(window.location.search);
-    const formName = params.get("form_name");
-    const uniqueId = params.get("id");
+    const { createApp } = Vue;
 
-    const titleEl = document.getElementById("form-title");
-    const errorEl = document.getElementById("error");
-    const successEl = document.getElementById("success");
-    const fieldsContainer = document.getElementById("fields-container");
-    const formEl = document.getElementById("dynamic-form");
-
-    if (!formName) {
-        errorEl.innerText = "Form name missing.";
-        errorEl.style.display = "block";
-        return;
-    }
-
-    frappe.call({
-        method: "formflow.formflow.api.get_form_config",
-        args: { form_name: formName },
-        callback: function (r) {
-
-            if (!r.message) {
-                errorEl.innerText = "Form not found.";
-                errorEl.style.display = "block";
-                return;
-            }
-
-            titleEl.innerText = r.message.form_name;
-
-            const fields = r.message.form_fields || [];
-
-            fields.forEach(field => {
-
-                if (field.hidden) return;
-
-                const div = document.createElement("div");
-                div.className = "mb-3";
-
-                const label = document.createElement("label");
-                label.className = "form-label";
-                label.innerText = (field.label_override || field.fieldname.replace(/_/g, " ").toUpperCase());
-
-                if (field.required) {
-                    label.innerHTML += " <span style='color:red'>*</span>";
-                }
-
-                const input = document.createElement("input");
-                input.type = "text";
-                input.className = "form-control";
-                input.name = field.fieldname;
-
-                if (field.read_only) {
-                    input.readOnly = true;
-                }
-
-                div.appendChild(label);
-                div.appendChild(input);
-                fieldsContainer.appendChild(div);
-            });
-
-        }
-    });
-
-    formEl.addEventListener("submit", function (e) {
-        e.preventDefault();
-
-        errorEl.style.display = "none";
-        successEl.style.display = "none";
-
-        const formData = {};
-        const inputs = formEl.querySelectorAll("input");
-
-        inputs.forEach(input => {
-            formData[input.name] = input.value;
-        });
-
-        frappe.call({
-            method: "formflow.formflow.api.submit_form",
-            args: {
-                form_name: formName,
-                data: formData,
-                unique_id: uniqueId
-            },
-            callback: function (r) {
-                successEl.innerText =
-                    "Submission successful! Reference ID: " +
-                    r.message.unique_id;
-                successEl.style.display = "block";
-            },
-            error: function (r) {
-                errorEl.innerText = "Submission failed.";
-                errorEl.style.display = "block";
-            }
-        });
-
-    });
+    createApp({}).mount("#app");
 
 });
 </script>
