@@ -19,13 +19,15 @@
         <input v-if="inputTypes.includes(field.fieldtype)"
                type="text"
                class="form-control"
-               v-model="formData[field.fieldname]">
+               v-model="formData[field.fieldname]"
+               :readonly="field.read_only">
 
         <!-- DATE -->
         <input v-else-if="field.fieldtype === 'Date'"
                type="date"
                class="form-control"
-               v-model="formData[field.fieldname]">
+               v-model="formData[field.fieldname]"
+               :readonly="field.read_only">
 
         <!-- CHECKBOX -->
         <div v-else-if="field.fieldtype === 'Check'" class="form-check">
@@ -33,19 +35,22 @@
                    class="form-check-input"
                    v-model="formData[field.fieldname]"
                    true-value="1"
-                   false-value="0">
+                   false-value="0"
+                   :disabled="field.read_only">
         </div>
 
-        <!-- ✅ ATTACH (RESUME SUPPORT ADDED BACK) -->
+        <!-- ATTACH -->
         <div v-else-if="field.fieldtype === 'Attach'">
 
             <input type="file"
                    class="d-none"
                    :id="field.fieldname"
+                   :disabled="field.read_only"
                    @change="handleFileUpload($event, field.fieldname)">
 
             <label :for="field.fieldname"
-                   class="btn btn-outline-primary w-100">
+                   class="btn btn-outline-primary w-100"
+                   :class="{ 'disabled': field.read_only }">
                 Choose File
             </label>
 
@@ -71,19 +76,23 @@
 
                     <input type="text"
                            class="form-control form-control-sm"
-                           v-model="row[child.fieldname]">
+                           v-model="row[child.fieldname]"
+                           :readonly="field.read_only">
                 </div>
 
                 <button type="button"
                         class="btn btn-sm btn-danger"
-                        @click="removeChildRow(field.fieldname, index)">
+                        @click="removeChildRow(field.fieldname, index)"
+                        :disabled="field.read_only">
                     Remove
                 </button>
+
             </div>
 
             <button type="button"
                     class="btn btn-sm btn-secondary"
-                    @click="addChildRow(field)">
+                    @click="addChildRow(field)"
+                    :disabled="field.read_only">
                 Add Row
             </button>
 
@@ -153,26 +162,43 @@ createApp({
 
         async loadForm() {
 
-            const response = await fetch(
-                `/api/method/formflow.formflow.api.get_form_config?form_name=${this.formName}`
-            );
+            try {
 
-            const result = await response.json();
+                const response = await fetch(
+                    `/api/method/formflow.formflow.api.get_form_config?form_name=${this.formName}`
+                );
 
-            this.formTitle = result.message.form_name;
-            this.fields = result.message.form_fields;
+                const result = await response.json();
 
-            this.fields.forEach(field => {
+                if (!response.ok) {
 
-                if (field.fieldtype === "Table") {
-                    this.formData[field.fieldname] = [];
-                } else if (field.fieldtype === "Check") {
-                    this.formData[field.fieldname] = 0;
-                } else {
-                    this.formData[field.fieldname] = "";
+                    if (result._server_messages) {
+                        const serverMessages = JSON.parse(result._server_messages);
+                        const messageObj = JSON.parse(serverMessages[0]);
+                        this.error = messageObj.message;
+                    } else {
+                        this.error = "Failed to load form";
+                    }
+
+                    return;
                 }
 
-            });
+                this.formTitle = result.message.form_name;
+                this.fields = result.message.form_fields;
+
+                this.fields.forEach(field => {
+                    if (field.fieldtype === "Table") {
+                        this.formData[field.fieldname] = [];
+                    } else if (field.fieldtype === "Check") {
+                        this.formData[field.fieldname] = 0;
+                    } else {
+                        this.formData[field.fieldname] = "";
+                    }
+                });
+
+            } catch (err) {
+                this.error = "Unable to load form";
+            }
         },
 
         async submitForm() {
@@ -204,7 +230,7 @@ createApp({
                         const messageObj = JSON.parse(serverMessages[0]);
                         this.error = messageObj.message;
                     } else {
-                        this.error = "creation not allowed";
+                        this.error = "Operation failed";
                     }
 
                     return;
@@ -215,11 +241,13 @@ createApp({
                     result.message.unique_id;
 
             } catch (err) {
-                this.error = "creation not allowed";
+                this.error = "Operation failed";
             }
         },
 
         async handleFileUpload(event, fieldname) {
+
+            if (event.target.disabled) return;
 
             const file = event.target.files[0];
             if (!file) return;
@@ -241,6 +269,8 @@ createApp({
         },
 
         addChildRow(field) {
+            if (field.read_only) return;
+
             const row = {};
             field.child_fields.forEach(child => {
                 row[child.fieldname] = "";
