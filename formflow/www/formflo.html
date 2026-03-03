@@ -1,123 +1,152 @@
 {% extends "templates/web.html" %}
 {% block page_content %}
 
-<div id="app" class="form-wrapper">
+<script src="https://cdn.tailwindcss.com"></script>
 
-    <h2 class="text-center mb-4">[[ formTitle ]]</h2>
+<div id="app" class="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
 
-    <div v-if="error" class="alert alert-danger">[[ error ]]</div>
-    <div v-if="success" class="alert alert-success">[[ success ]]</div>
+    <div class="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-8">
 
-    <div v-for="field in visibleFields" :key="field.fieldname" class="mb-3">
+        <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">
+            [[ formTitle ]]
+        </h2>
 
-        <label class="form-label fw-semibold">
-            [[ field.label ]]
-            <span v-if="field.required" class="text-danger">*</span>
-        </label>
-
-        <!-- TEXT / NUMERIC -->
-        <input v-if="inputTypes.includes(field.fieldtype)"
-               type="text"
-               class="form-control"
-               v-model="formData[field.fieldname]"
-               :readonly="field.read_only">
-
-        <!-- DATE -->
-        <input v-else-if="field.fieldtype === 'Date'"
-               type="date"
-               class="form-control"
-               v-model="formData[field.fieldname]"
-               :readonly="field.read_only">
-
-        <!-- CHECKBOX -->
-        <div v-else-if="field.fieldtype === 'Check'" class="form-check">
-            <input type="checkbox"
-                   class="form-check-input"
-                   v-model="formData[field.fieldname]"
-                   true-value="1"
-                   false-value="0"
-                   :disabled="field.read_only">
+        <div v-if="error" class="mb-4 p-3 rounded-lg bg-red-100 text-red-700 text-sm">
+            [[ error ]]
         </div>
 
-        <!-- ATTACH -->
-        <div v-else-if="field.fieldtype === 'Attach'">
+        <div v-if="success" class="mb-4 p-3 rounded-lg bg-green-100 text-green-700 text-sm">
+            [[ success ]]
+        </div>
 
-            <input type="file"
-                   class="d-none"
-                   :id="field.fieldname"
-                   :disabled="field.read_only"
-                   @change="handleFileUpload($event, field.fieldname)">
+        <div v-for="field in visibleFields" :key="field.fieldname" class="mb-5">
 
-            <label :for="field.fieldname"
-                   class="btn btn-outline-primary w-100"
-                   :class="{ 'disabled': field.read_only }">
-                Choose File
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+                [[ field.label ]]
+                <span v-if="field.required" class="text-red-500">*</span>
             </label>
 
-            <div v-if="formData[field.fieldname]"
-                 class="small text-success mt-2">
-                File uploaded successfully
+            <!-- Text Inputs -->
+            <input v-if="inputTypes.includes(field.fieldtype)"
+                   type="text"
+                   class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black focus:outline-none"
+                   v-model="formData[field.fieldname]"
+                   :readonly="field.read_only">
+
+            <!-- Date -->
+            <input v-else-if="field.fieldtype === 'Date'"
+                   type="date"
+                   class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black focus:outline-none"
+                   v-model="formData[field.fieldname]"
+                   :readonly="field.read_only">
+
+            <!-- Checkbox -->
+            <div v-else-if="field.fieldtype === 'Check'" class="flex items-center space-x-2">
+                <input type="checkbox"
+                       class="h-4 w-4 text-black border-gray-300 rounded"
+                       v-model="formData[field.fieldname]"
+                       true-value="1"
+                       false-value="0"
+                       :disabled="field.read_only">
+                <span class="text-sm text-gray-600">Yes</span>
             </div>
 
-        </div>
+            <!-- Attach -->
+            <div v-else-if="field.fieldtype === 'Attach'">
 
-        <!-- CHILD TABLE -->
-        <div v-else-if="field.fieldtype === 'Table'" class="border p-3 rounded">
+                <input type="file"
+                       class="hidden"
+                       :id="field.fieldname"
+                       :disabled="field.read_only"
+                       @change="handleFileUpload($event, field.fieldname)">
 
-            <div v-for="(row, index) in formData[field.fieldname]"
-                 :key="index"
-                 class="mb-3 border-bottom pb-3">
+                <label :for="field.fieldname"
+                       class="inline-block w-full text-center px-4 py-2 bg-black text-white rounded-lg cursor-pointer hover:bg-gray-800 transition"
+                       :class="{ 'opacity-50 cursor-not-allowed': field.read_only }">
+                    Choose File
+                </label>
 
-                <div v-for="child in field.child_fields"
-                     :key="child.fieldname"
-                     class="mb-2">
+                <!-- Uploaded File Preview -->
+                <div v-if="formData[field.fieldname]"
+                     class="mt-3 p-3 border rounded-lg bg-gray-50">
 
-                    <label class="small">[[ child.label ]]</label>
+                    <!-- Image Preview -->
+                    <div v-if="isImage(formData[field.fieldname])" class="mb-3">
+                        <img :src="formData[field.fieldname]"
+                             class="max-h-40 rounded-md border shadow-sm">
+                    </div>
 
-                    <input type="text"
-                           class="form-control form-control-sm"
-                           v-model="row[child.fieldname]"
-                           :readonly="field.read_only">
+                    <!-- File Info -->
+                    <div class="flex items-center justify-between text-sm">
+
+                        <a :href="formData[field.fieldname]"
+                           target="_blank"
+                           class="text-blue-600 underline break-all">
+                            [[ getFileName(formData[field.fieldname]) ]]
+                        </a>
+
+                        <button type="button"
+                                class="text-red-500 hover:text-red-700 ml-3"
+                                @click="formData[field.fieldname] = ''">
+                            Remove
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Table -->
+            <div v-else-if="field.fieldtype === 'Table'" class="border rounded-lg p-4 bg-gray-50">
+
+                <div v-for="(row, index) in formData[field.fieldname]"
+                     :key="index"
+                     class="mb-4 border-b pb-4">
+
+                    <div v-for="child in field.child_fields"
+                         :key="child.fieldname"
+                         class="mb-2">
+
+                        <label class="block text-xs font-medium text-gray-600 mb-1">
+                            [[ child.label ]]
+                        </label>
+
+                        <input type="text"
+                               class="w-full px-2 py-1 border rounded-md focus:ring-1 focus:ring-black focus:outline-none text-sm"
+                               v-model="row[child.fieldname]"
+                               :readonly="field.read_only">
+                    </div>
+
+                    <button type="button"
+                            class="mt-2 text-xs px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition"
+                            @click="removeChildRow(field.fieldname, index)"
+                            :disabled="field.read_only">
+                        Remove
+                    </button>
+
                 </div>
 
                 <button type="button"
-                        class="btn btn-sm btn-danger"
-                        @click="removeChildRow(field.fieldname, index)"
+                        class="text-xs px-4 py-2 bg-gray-800 text-white rounded hover:bg-black transition"
+                        @click="addChildRow(field)"
                         :disabled="field.read_only">
-                    Remove
+                    Add Row
                 </button>
 
             </div>
 
-            <button type="button"
-                    class="btn btn-sm btn-secondary"
-                    @click="addChildRow(field)"
-                    :disabled="field.read_only">
-                Add Row
-            </button>
-
         </div>
+
+        <button type="button"
+                class="w-full mt-6 py-3 bg-black text-white font-semibold rounded-lg hover:bg-gray-900 transition"
+                @click="submitForm">
+            Submit Form
+        </button>
 
     </div>
 
-    <button type="button"
-            class="btn btn-dark w-100 mt-4"
-            @click="submitForm">
-        Submit Form
-    </button>
-
 </div>
-
-<style>
-.form-wrapper {
-    max-width: 650px;
-    margin: 60px auto;
-    padding: 35px;
-    background: white;
-    border-radius: 14px;
-    box-shadow: 0 15px 40px rgba(0,0,0,0.08);
-}
-</style>
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
@@ -151,35 +180,29 @@ createApp({
         }
     },
 
-    mounted() {
+    async mounted() {
         const params = new URLSearchParams(window.location.search);
         this.formName = params.get("form_name");
         this.uniqueId = params.get("id");
-        this.loadForm();
+
+        await this.loadForm();
+
+        if (this.uniqueId) {
+            await this.prefillData();
+        }
     },
 
     methods: {
 
         async loadForm() {
-
             try {
-
                 const response = await fetch(
                     `/api/method/formflow.formflow.api.get_form_config?form_name=${this.formName}`
                 );
-
                 const result = await response.json();
 
                 if (!response.ok) {
-
-                    if (result._server_messages) {
-                        const serverMessages = JSON.parse(result._server_messages);
-                        const messageObj = JSON.parse(serverMessages[0]);
-                        this.error = messageObj.message;
-                    } else {
-                        this.error = "Failed to load form";
-                    }
-
+                    this.handleError(result);
                     return;
                 }
 
@@ -201,13 +224,33 @@ createApp({
             }
         },
 
+        async prefillData() {
+            try {
+                const response = await fetch(
+                    `/api/method/formflow.formflow.api.get_doc_by_unique_id?form_name=${this.formName}&unique_id=${this.uniqueId}`
+                );
+                const result = await response.json();
+
+                if (!response.ok) {
+                    this.handleError(result);
+                    return;
+                }
+
+                Object.keys(result.message).forEach(key => {
+                    this.formData[key] = result.message[key];
+                });
+
+            } catch (err) {
+                this.error = "Failed to fetch document";
+            }
+        },
+
         async submitForm() {
 
             this.error = "";
             this.success = "";
 
             try {
-
                 const response = await fetch(
                     `/api/method/formflow.formflow.api.submit_form`,
                     {
@@ -217,22 +260,15 @@ createApp({
                             form_name: this.formName,
                             data: this.formData,
                             unique_id: this.uniqueId
-                        })
+                        }),
+                        credentials: "same-origin"
                     }
                 );
 
                 const result = await response.json();
 
                 if (!response.ok) {
-
-                    if (result._server_messages) {
-                        const serverMessages = JSON.parse(result._server_messages);
-                        const messageObj = JSON.parse(serverMessages[0]);
-                        this.error = messageObj.message;
-                    } else {
-                        this.error = "Operation failed";
-                    }
-
+                    this.handleError(result);
                     return;
                 }
 
@@ -247,30 +283,48 @@ createApp({
 
         async handleFileUpload(event, fieldname) {
 
-            if (event.target.disabled) return;
-
             const file = event.target.files[0];
             if (!file) return;
 
             const fd = new FormData();
             fd.append("file", file);
-            fd.append("is_private", 0);
 
-            const response = await fetch("/api/method/upload_file", {
-                method: "POST",
-                body: fd
-            });
+            try {
+                const response = await fetch(
+                    "/api/method/formflow.formflow.api.upload_public_file",
+                    {
+                        method: "POST",
+                        body: fd,
+                        credentials: "same-origin"
+                    }
+                );
 
-            const result = await response.json();
+                const result = await response.json();
 
-            if (result.message && result.message.file_url) {
-                this.formData[fieldname] = result.message.file_url;
+                if (!response.ok) {
+                    this.error = "File upload failed";
+                    return;
+                }
+
+                if (result.message && result.message.file_url) {
+                    this.formData[fieldname] = result.message.file_url;
+                }
+
+            } catch (err) {
+                this.error = "File upload failed";
             }
+        },
+
+        isImage(url) {
+            return /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+        },
+
+        getFileName(url) {
+            return url.split('/').pop();
         },
 
         addChildRow(field) {
             if (field.read_only) return;
-
             const row = {};
             field.child_fields.forEach(child => {
                 row[child.fieldname] = "";
@@ -280,6 +334,16 @@ createApp({
 
         removeChildRow(fieldname, index) {
             this.formData[fieldname].splice(index, 1);
+        },
+
+        handleError(result) {
+            if (result._server_messages) {
+                const serverMessages = JSON.parse(result._server_messages);
+                const messageObj = JSON.parse(serverMessages[0]);
+                this.error = messageObj.message;
+            } else {
+                this.error = "Operation failed";
+            }
         }
 
     }
