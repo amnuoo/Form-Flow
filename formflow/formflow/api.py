@@ -11,14 +11,12 @@ def generate_reference_id(prefix):
 @frappe.whitelist(allow_guest=True)
 def get_form_config(form_name):
 
-    # Allow metadata access even for core doctypes
-    frappe.set_user("Administrator")
-
     form = frappe.get_doc("Form Configuration", {"form_name": form_name})
 
     if not form.is_active:
         frappe.throw("Form is inactive")
 
+    # LOGIN CHECK
     if form.require_login and frappe.session.user == "Guest":
         frappe.throw("Please login first")
 
@@ -67,8 +65,6 @@ def get_form_config(form_name):
 @frappe.whitelist(allow_guest=True)
 def get_doc_by_unique_id(form_name, unique_id):
 
-    frappe.set_user("Administrator")
-
     form = frappe.get_doc("Form Configuration", {"form_name": form_name})
 
     if not form.is_active:
@@ -95,8 +91,6 @@ def get_doc_by_unique_id(form_name, unique_id):
 @frappe.whitelist(allow_guest=True)
 def submit_form(form_name, data, unique_id=None):
 
-    frappe.set_user("Administrator")
-
     data = frappe.parse_json(data)
 
     if unique_id in ("", None, "null", "None"):
@@ -107,6 +101,7 @@ def submit_form(form_name, data, unique_id=None):
     if not form.is_active:
         frappe.throw("Form is inactive")
 
+    # LOGIN CHECK
     if form.require_login and frappe.session.user == "Guest":
         frappe.throw("Please login first")
 
@@ -121,7 +116,6 @@ def submit_form(form_name, data, unique_id=None):
     action_type = ""
     new_id = ""
 
-    # CREATE
     if unique_id is None:
 
         if not form.allow_create:
@@ -156,7 +150,6 @@ def submit_form(form_name, data, unique_id=None):
 
         action_type = "Create"
 
-    # UPDATE
     else:
 
         if not form.allow_update:
@@ -186,9 +179,9 @@ def submit_form(form_name, data, unique_id=None):
         doc.save(ignore_permissions=True)
 
         new_id = unique_id
+
         action_type = "Update"
 
-    # File linking
     meta = frappe.get_meta(form.target_doctype)
 
     for field in form.form_fields:
@@ -210,7 +203,6 @@ def submit_form(form_name, data, unique_id=None):
                     }
                 )
 
-    # Logging
     try:
 
         ip_address = frappe.local.request_ip or "Unknown"
