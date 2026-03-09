@@ -1,10 +1,18 @@
 import frappe
-from .utils import generate_unique_id
+from frappe.model.naming import make_autoname
 
+
+def generate_reference_id(prefix):
+    year = frappe.utils.now_datetime().year
+    series = f"{prefix}-{year}-.#####"
+    return make_autoname(series)
 
 
 @frappe.whitelist(allow_guest=True)
 def get_form_config(form_name):
+
+    # Allow metadata access even for core doctypes
+    frappe.set_user("Administrator")
 
     form = frappe.get_doc("Form Configuration", {"form_name": form_name})
 
@@ -12,14 +20,16 @@ def get_form_config(form_name):
         frappe.throw("Form is inactive")
 
     if form.require_login and frappe.session.user == "Guest":
-        frappe.throw("Login required to access this form")
+        frappe.throw("Please login first")
 
     meta = frappe.get_meta(form.target_doctype)
 
     fields = []
 
     for f in form.form_fields:
+
         df = meta.get_field(f.fieldname)
+
         if not df:
             continue
 
@@ -33,7 +43,9 @@ def get_form_config(form_name):
         }
 
         if df.fieldtype == "Table":
+
             child_meta = frappe.get_meta(df.options)
+
             field_data["child_fields"] = [
                 {
                     "fieldname": c.fieldname,
@@ -52,9 +64,10 @@ def get_form_config(form_name):
     }
 
 
-
 @frappe.whitelist(allow_guest=True)
 def get_doc_by_unique_id(form_name, unique_id):
+
+    frappe.set_user("Administrator")
 
     form = frappe.get_doc("Form Configuration", {"form_name": form_name})
 
@@ -62,21 +75,17 @@ def get_doc_by_unique_id(form_name, unique_id):
         frappe.throw("Form is inactive")
 
     if form.require_login and frappe.session.user == "Guest":
-        frappe.throw("Login required")
+        frappe.throw("Please login first")
 
-    doc_name = frappe.db.get_value(
-        form.target_doctype,
-        {form.unique_id_field: unique_id}
-    )
-
-    if not doc_name:
+    if not frappe.db.exists(form.target_doctype, unique_id):
         frappe.throw("Invalid Reference ID")
 
-    doc = frappe.get_doc(form.target_doctype, doc_name)
+    doc = frappe.get_doc(form.target_doctype, unique_id)
 
     allowed_fields = [f.fieldname for f in form.form_fields if not f.hidden]
 
     data = {}
+
     for field in allowed_fields:
         data[field] = doc.get(field)
 
@@ -86,70 +95,112 @@ def get_doc_by_unique_id(form_name, unique_id):
 @frappe.whitelist(allow_guest=True)
 def submit_form(form_name, data, unique_id=None):
 
+    frappe.set_user("Administrator")
+
     data = frappe.parse_json(data)
+
+    if unique_id in ("", None, "null", "None"):
+        unique_id = None
+
     form = frappe.get_doc("Form Configuration", {"form_name": form_name})
 
     if not form.is_active:
         frappe.throw("Form is inactive")
 
     if form.require_login and frappe.session.user == "Guest":
-        frappe.throw("Login required")
+        frappe.throw("Please login first")
 
     allowed_fields = [f.fieldname for f in form.form_fields if not f.hidden]
+
     cleaned_data = {k: v for k, v in data.items() if k in allowed_fields}
 
     for field in form.form_fields:
         if field.required and not cleaned_data.get(field.fieldname):
-            frappe.throw(f"{field.fieldname} is mandatory")
+            frappe.throw(f"{field.label_override or field.fieldname} is mandatory")
 
     action_type = ""
     new_id = ""
 
-    if not unique_id:
+    # CREATE
+    if unique_id is None:
 
         if not form.allow_create:
-            frappe.throw("creation not allowed")
+            frappe.throw("Creation is not allowed")
 
         doc = frappe.new_doc(form.target_doctype)
-        doc.update(cleaned_data)
 
-        new_id = generate_unique_id(
-            form.target_doctype,
-            form.unique_id_field
-        )
+        meta = frappe.get_meta(form.target_doctype)
 
-        doc.set(form.unique_id_field, new_id)
+        for key, value in cleaned_data.items():
+
+            df = meta.get_field(key)
+
+            if df and df.fieldtype == "Table":
+
+                for row in value:
+                    doc.append(key, row)
+
+            else:
+                doc.set(key, value)
+
+        prefix = form.reference_prefix or "REF"
+
+        new_id = generate_reference_id(prefix)
+
+        doc.name = new_id
+
+        if hasattr(doc, "reference_id"):
+            doc.reference_id = new_id
+
         doc.insert(ignore_permissions=True)
 
         action_type = "Create"
 
+    # UPDATE
     else:
 
         if not form.allow_update:
-            frappe.throw("update is not allowed")
+            frappe.throw("Update is not allowed")
 
-        doc_name = frappe.db.get_value(
-            form.target_doctype,
-            {form.unique_id_field: unique_id}
-        )
-
-        if not doc_name:
+        if not frappe.db.exists(form.target_doctype, unique_id):
             frappe.throw("Invalid Reference ID")
 
-        doc = frappe.get_doc(form.target_doctype, doc_name)
-        doc.update(cleaned_data)
+        doc = frappe.get_doc(form.target_doctype, unique_id)
+
+        meta = frappe.get_meta(form.target_doctype)
+
+        for key, value in cleaned_data.items():
+
+            df = meta.get_field(key)
+
+            if df and df.fieldtype == "Table":
+
+                doc.set(key, [])
+
+                for row in value:
+                    doc.append(key, row)
+
+            else:
+                doc.set(key, value)
+
         doc.save(ignore_permissions=True)
 
         new_id = unique_id
         action_type = "Update"
 
+    # File linking
     meta = frappe.get_meta(form.target_doctype)
 
     for field in form.form_fields:
+
         df = meta.get_field(field.fieldname)
+
         if df and df.fieldtype == "Attach":
+
             file_url = cleaned_data.get(field.fieldname)
+
             if file_url:
+
                 frappe.db.set_value(
                     "File",
                     {"file_url": file_url},
@@ -159,7 +210,9 @@ def submit_form(form_name, data, unique_id=None):
                     }
                 )
 
+    # Logging
     try:
+
         ip_address = frappe.local.request_ip or "Unknown"
 
         log_doc = frappe.get_doc({
@@ -188,6 +241,7 @@ def upload_public_file():
         frappe.throw("No file attached")
 
     uploaded_file = frappe.request.files["file"]
+
     content = uploaded_file.stream.read()
 
     file_doc = save_file(
@@ -201,5 +255,3 @@ def upload_public_file():
     return {
         "file_url": file_doc.file_url
     }
-
-
